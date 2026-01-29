@@ -7,6 +7,9 @@ An interactive Git worktree manager powered by fzf. Easily create, switch betwee
 - 🔍 **Interactive worktree selection** with fzf
 - ➕ **Create new worktrees** from existing or new branches
 - 🗑️ **Delete multiple worktrees** at once
+- 📊 **Status overview** - see dirty/clean state, ahead/behind for all worktrees
+- 🔒 **Lock/Unlock** - protect worktrees from accidental deletion
+- 🏠 **Bare repo workflow** - initialize projects optimized for worktrees
 - 🎨 **Colorized output** for better readability
 - ⌨️ **Tab completion** for Bash and Zsh
 - 🚀 **Fast and lightweight** - just a Bash script
@@ -118,6 +121,57 @@ gwf rm       # Alias for delete
 
 Select one or more worktrees (use Tab to select multiple) and confirm deletion.
 
+### Status Overview
+
+```bash
+gwf status   # Show all worktrees with status indicators
+```
+
+Shows at a glance:
+- ● Green = clean, Yellow = dirty, Red = missing
+- ↑/↓ ahead/behind remote tracking branch
+- 🔒 locked worktrees
+
+### Current Worktree Info
+
+```bash
+gwf info     # Show detailed info about current worktree
+```
+
+### Initialize Bare Repo (Recommended Workflow)
+
+```bash
+gwf init myproject                              # Create new bare repo
+gwf init myproject git@github.com:user/repo.git # Clone as bare repo
+```
+
+This creates a bare repository structure optimized for worktree workflow:
+```
+myproject.git/   <- bare repo (git data only)
+myproject/       <- main worktree (main/master branch)
+```
+
+### Lock/Unlock Worktrees
+
+```bash
+gwf lock     # Lock a worktree (prevents accidental deletion)
+gwf unlock   # Unlock a worktree
+```
+
+### Move Worktree
+
+```bash
+gwf move     # Move a worktree to a new path
+```
+
+### Maintenance Commands
+
+```bash
+gwf prune    # Remove stale worktree entries
+gwf repair   # Repair worktree administrative files
+gwf main     # Jump to main worktree (no fzf)
+```
+
 ### Help and Version
 
 ```bash
@@ -140,9 +194,17 @@ brew install fzf
 
 This tool wraps Git's `worktree` command with fzf for interactive selection:
 
-- `gwf list` → `git worktree list | fzf`
-- `gwf add` → `git worktree add` with branch selection
-- `gwf delete` → `git worktree remove` with multi-select
+| Command | Git Equivalent |
+|---------|----------------|
+| `gwf list` | `git worktree list \| fzf` |
+| `gwf add` | `git worktree add` with branch selection |
+| `gwf delete` | `git worktree remove` with multi-select |
+| `gwf status` | `git worktree list` with status info |
+| `gwf prune` | `git worktree prune` with preview |
+| `gwf lock/unlock` | `git worktree lock/unlock` with fzf |
+| `gwf move` | `git worktree move` with fzf |
+| `gwf repair` | `git worktree repair` |
+| `gwf init` | `git clone --bare` + initial worktree |
 
 The shell wrapper function intercepts the output and performs the `cd` command when switching worktrees.
 
