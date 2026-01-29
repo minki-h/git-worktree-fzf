@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.3.3"
+VERSION="1.3.4"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -99,7 +99,7 @@ cmd_list() {
   check_git_repo
   check_dependencies
 
-  local selected_worktree=$(git worktree list | fzf --prompt="Select worktree: " --height=40% --reverse | awk '{print $1}')
+  local selected_worktree=$(git worktree list | fzf --no-history --prompt="Select worktree: " --height=40% --reverse | awk '{print $1}')
 
   if [ -n "$selected_worktree" ]; then
     echo "CD:$selected_worktree"
@@ -147,7 +147,7 @@ cmd_add() {
     local branches=$(git branch -a | sed 's/.* //g' | sed 's/remotes\/origin\///' | sort -u)
 
     # Use fzf with --print-query to allow both selection and new branch creation
-    local selected=$(echo "$branches" | fzf --print-query --prompt="Select or type new branch: " --height=40% --reverse)
+    local selected=$(echo "$branches" | fzf --no-history --print-query --prompt="Select or type new branch: " --height=40% --reverse)
 
     # Extract query and selection
     # --print-query outputs: line1=query (what user typed), line2=selection (what was selected)
@@ -162,21 +162,18 @@ cmd_add() {
       exit 0
     fi
 
-    # Ask if user wants to create with a different name
+    # Ask if user wants a custom directory name
     echo -e "${CYAN}Selected: $target_branch${NC}"
-    read -p "New branch name (empty to use selected): " new_name
-    if [[ -n "$new_name" ]]; then
-      base_point="$target_branch"
-      target_branch="$new_name"
-    fi
+    read -p "Directory name (empty to use branch name): " custom_dir
   fi
 
   # Get the base directory (parent of main worktree)
   local main_worktree=$(git worktree list | head -1 | awk '{print $1}')
   local base_dir=$(dirname "$main_worktree")
 
-  # Use branch name as folder path (create nested directories if needed)
-  local target_path="$base_dir/$target_branch"
+  # Use custom directory name if provided, otherwise use branch name
+  local dir_name="${custom_dir:-$target_branch}"
+  local target_path="$base_dir/$dir_name"
   local parent_dir=$(dirname "$target_path")
   if [[ ! -d "$parent_dir" ]]; then
     mkdir -p "$parent_dir"
@@ -248,7 +245,7 @@ cmd_delete() {
   else
     # Interactive mode
     check_dependencies
-    selected=$(git worktree list | fzf --multi --prompt="Delete worktree(s): " --height=40% --reverse | awk '{print $1}')
+    selected=$(git worktree list | fzf --no-history --multi --prompt="Delete worktree(s): " --height=40% --reverse | awk '{print $1}')
   fi
 
   if [[ -z "$selected" ]]; then
@@ -446,7 +443,7 @@ cmd_lock() {
   check_git_repo
   check_dependencies
 
-  local selected=$(git worktree list | fzf --prompt="Lock worktree: " --height=40% --reverse | awk '{print $1}')
+  local selected=$(git worktree list | fzf --no-history --prompt="Lock worktree: " --height=40% --reverse | awk '{print $1}')
 
   if [[ -z "$selected" ]]; then
     echo -e "${YELLOW}No worktree selected${NC}" >&2
@@ -501,7 +498,7 @@ cmd_unlock() {
     return 0
   fi
 
-  local selected=$(echo -n "$locked_worktrees" | fzf --prompt="Unlock worktree: " --height=40% --reverse | awk '{print $1}')
+  local selected=$(echo -n "$locked_worktrees" | fzf --no-history --prompt="Unlock worktree: " --height=40% --reverse | awk '{print $1}')
 
   if [[ -z "$selected" ]]; then
     echo -e "${YELLOW}No worktree selected${NC}" >&2
@@ -517,7 +514,7 @@ cmd_move() {
   check_git_repo
   check_dependencies
 
-  local selected=$(git worktree list | fzf --prompt="Move worktree: " --height=40% --reverse | awk '{print $1}')
+  local selected=$(git worktree list | fzf --no-history --prompt="Move worktree: " --height=40% --reverse | awk '{print $1}')
 
   if [[ -z "$selected" ]]; then
     echo -e "${YELLOW}No worktree selected${NC}" >&2
