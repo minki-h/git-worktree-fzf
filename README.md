@@ -6,7 +6,7 @@ An interactive Git worktree manager powered by fzf. Easily create, switch betwee
 
 ```bash
 # 1. Install
-brew tap minki-h/tap && brew install git-worktree-fzf
+brew tap minki-h/git-worktree-fzf && brew install git-worktree-fzf
 
 # 2. Add shell wrapper (required for directory switching)
 # For Zsh - add to ~/.zshrc:
@@ -42,7 +42,7 @@ gwf rm feature/old     # Delete worktree
 ### Via Homebrew
 
 ```bash
-brew tap minki-h/tap
+brew tap minki-h/git-worktree-fzf
 brew install git-worktree-fzf
 ```
 
