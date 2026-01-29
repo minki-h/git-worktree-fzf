@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.1.1"
+VERSION="1.2.0"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -42,31 +42,35 @@ show_help() {
 gwf - Git Worktree with FZF
 
 USAGE:
-    gwf [SUBCOMMAND]
+    gwf [SUBCOMMAND] [ARGS]
 
 SUBCOMMANDS:
-    list, ls        List and switch to a worktree (default)
-    add, new        Add a new worktree
-    delete, rm      Delete one or more worktrees
-    status          Show status of all worktrees (dirty/clean, ahead/behind)
-    info            Show current worktree information
-    prune           Remove stale worktree entries
-    lock            Lock a worktree (prevent accidental deletion)
-    unlock          Unlock a worktree
-    move            Move a worktree to a new path
-    repair          Repair worktree administrative files
-    main            Switch to main worktree (no fzf)
-    init            Initialize a bare repo for worktree workflow
-    help, --help    Show this help message
-    version         Show version information
+    list, ls [name]       List and switch to a worktree (default)
+    add, new [branch]     Add a new worktree for branch
+    delete, rm [branch..] Delete one or more worktrees
+    status                Show status of all worktrees (dirty/clean, ahead/behind)
+    info                  Show current worktree information
+    prune                 Remove stale worktree entries
+    lock [path]           Lock a worktree (prevent accidental deletion)
+    unlock [path]         Unlock a worktree
+    move [path] [newpath] Move a worktree to a new path
+    repair                Repair worktree administrative files
+    main                  Switch to main worktree (no fzf)
+    init <name> [url]     Initialize a bare repo for worktree workflow
+    help, --help          Show this help message
+    version               Show version information
 
 EXAMPLES:
-    gwf             # Interactive list and switch
-    gwf add         # Create new worktree
-    gwf delete      # Delete worktrees
-    gwf status      # See all worktrees status at a glance
-    gwf main        # Jump to main worktree
-    gwf init myproj # Init bare repo for worktree workflow
+    gwf                     # Interactive list and switch
+    gwf feature/login       # Switch to worktree for feature/login
+    gwf add                 # Create new worktree (interactive)
+    gwf add feature/signup  # Create worktree for feature/signup directly
+    gwf delete              # Delete worktrees (interactive)
+    gwf delete feature/old  # Delete worktree for feature/old directly
+    gwf rm fix/bug1 fix/bug2  # Delete multiple worktrees
+    gwf status              # See all worktrees status at a glance
+    gwf main                # Jump to main worktree
+    gwf init myproj         # Init bare repo for worktree workflow
 
 SHELL INTEGRATION:
     The 'list' command outputs a path prefixed with 'CD:' which can be
@@ -92,37 +96,66 @@ EOF
 
 # List worktrees and select one to switch to
 cmd_list() {
+  local target="$1"
   check_git_repo
-  check_dependencies
 
-  local selected_worktree=$(git worktree list | fzf --prompt="Select worktree: " --height=40% --reverse | awk '{print $1}')
-
-  if [ -n "$selected_worktree" ]; then
-    echo "CD:$selected_worktree"
+  if [[ -n "$target" ]]; then
+    # Direct selection by branch name or path
+    local selected_worktree
+    # Try to find by branch name first
+    selected_worktree=$(git worktree list | grep -E "\[$target\]" | awk '{print $1}' | head -1)
+    # If not found, try by path (partial match)
+    if [[ -z "$selected_worktree" ]]; then
+      selected_worktree=$(git worktree list | grep -F "$target" | awk '{print $1}' | head -1)
+    fi
+    if [[ -n "$selected_worktree" ]]; then
+      echo "CD:$selected_worktree"
+    else
+      echo -e "${RED}Error: No worktree found matching '$target'${NC}" >&2
+      exit 1
+    fi
+  else
+    # Interactive selection
+    check_dependencies
+    local selected_worktree=$(git worktree list | fzf --prompt="Select worktree: " --height=40% --reverse | awk '{print $1}')
+    if [ -n "$selected_worktree" ]; then
+      echo "CD:$selected_worktree"
+    fi
   fi
 }
 
 # Add a new worktree
 cmd_add() {
+  local target_branch="$1"
+  local base_point="${2:-HEAD}"
   check_git_repo
-  check_dependencies
 
-  # Get list of all branches (local and remote, deduplicated)
-  local branches=$(git branch -a | sed 's/.* //g' | sed 's/remotes\/origin\///' | sort -u)
+  if [[ -z "$target_branch" ]]; then
+    # Interactive mode
+    check_dependencies
 
-  # Use fzf with --print-query to allow both selection and new branch creation
-  local selected=$(echo "$branches" | fzf --print-query --prompt="Select or type new branch: " --height=40% --reverse)
+    # Get list of all branches (local and remote, deduplicated)
+    local branches=$(git branch -a | sed 's/.* //g' | sed 's/remotes\/origin\///' | sort -u)
 
-  # Extract query and selection
-  local query=$(echo "$selected" | head -n1)
-  selected=$(echo "$selected" | tail -n1)
+    # Use fzf with --print-query to allow both selection and new branch creation
+    local selected=$(echo "$branches" | fzf --print-query --prompt="Select or type new branch: " --height=40% --reverse)
 
-  # Use query if provided, otherwise use selection
-  local target_branch=${query:-$selected}
+    # Extract query and selection
+    local query=$(echo "$selected" | head -n1)
+    selected=$(echo "$selected" | tail -n1)
 
-  if [ -z "$target_branch" ]; then
-    echo -e "${YELLOW}No branch selected${NC}" >&2
-    exit 0
+    # Use query if provided, otherwise use selection
+    target_branch=${query:-$selected}
+
+    if [[ -z "$target_branch" ]]; then
+      echo -e "${YELLOW}No branch selected${NC}" >&2
+      exit 0
+    fi
+
+    # Update base_point based on selection
+    if [[ "$query" != "$selected" ]] && [[ -n "$selected" ]]; then
+      base_point="$selected"
+    fi
   fi
 
   # Use branch name as folder path (create nested directories if needed)
@@ -137,12 +170,6 @@ cmd_add() {
     echo -e "${GREEN}Checking out existing branch: $target_branch${NC}"
     git worktree add "$target_path" "$target_branch"
   else
-    # Determine base point for new branch
-    local base_point="$selected"
-    if [[ "$query" = "$selected" ]] || [[ -z "$selected" ]]; then
-      base_point="HEAD"
-    fi
-
     echo -e "${GREEN}Creating new branch: $target_branch from $base_point${NC}"
     git worktree add -b "$target_branch" "$target_path" "$base_point"
   fi
@@ -156,14 +183,44 @@ cmd_add() {
   fi
 }
 
+# Find worktree path by branch name or partial path match
+find_worktree() {
+  local target="$1"
+  local worktree_path
+  # Try to find by branch name first
+  worktree_path=$(git worktree list | grep -E "\[$target\]" | awk '{print $1}' | head -1)
+  # If not found, try by path (partial match)
+  if [[ -z "$worktree_path" ]]; then
+    worktree_path=$(git worktree list | grep -F "$target" | awk '{print $1}' | head -1)
+  fi
+  echo "$worktree_path"
+}
+
 # Delete one or more worktrees
 cmd_delete() {
   check_git_repo
-  check_dependencies
 
-  local selected=$(git worktree list | fzf --multi --prompt="Delete worktree(s): " --height=40% --reverse | awk '{print $1}')
+  local selected=""
 
-  if [ -z "$selected" ]; then
+  if [[ $# -gt 0 ]]; then
+    # Direct mode: arguments provided
+    for target in "$@"; do
+      local worktree_path
+      worktree_path=$(find_worktree "$target")
+      if [[ -n "$worktree_path" ]]; then
+        selected+="$worktree_path"$'\n'
+      else
+        echo -e "${RED}Warning: No worktree found matching '$target'${NC}" >&2
+      fi
+    done
+    selected="${selected%$'\n'}"  # Remove trailing newline
+  else
+    # Interactive mode
+    check_dependencies
+    selected=$(git worktree list | fzf --multi --prompt="Delete worktree(s): " --height=40% --reverse | awk '{print $1}')
+  fi
+
+  if [[ -z "$selected" ]]; then
     echo -e "${YELLOW}No worktrees selected${NC}" >&2
     exit 0
   fi
@@ -177,6 +234,7 @@ cmd_delete() {
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     local failed=0
     while IFS= read -r worktree; do
+      [[ -z "$worktree" ]] && continue
       echo -e "${GREEN}Removing: $worktree${NC}"
       if ! git worktree remove "$worktree"; then
         echo -e "${RED}Failed to remove: $worktree${NC}" >&2
@@ -583,13 +641,13 @@ main() {
 
   case "$subcommand" in
     list|ls)
-      cmd_list
+      cmd_list "$@"
       ;;
     add|new)
-      cmd_add
+      cmd_add "$@"
       ;;
     delete|rm)
-      cmd_delete
+      cmd_delete "$@"
       ;;
     status)
       cmd_status
