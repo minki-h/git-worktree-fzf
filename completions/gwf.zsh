@@ -61,9 +61,6 @@ _gwf() {
         delete|rm)
           _gwf_worktree_branches
           ;;
-        list|ls)
-          _gwf_worktree_branches
-          ;;
         lock|unlock|move)
           _gwf_worktrees
           ;;

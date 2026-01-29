@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.2.1"
+VERSION="1.2.2"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -45,7 +45,7 @@ USAGE:
     gwf [SUBCOMMAND] [ARGS]
 
 SUBCOMMANDS:
-    list, ls [name]       List and switch to a worktree (default)
+    list, ls              List and switch to a worktree (interactive)
     add, new [branch]     Add a new worktree for branch
     delete, rm [branch..] Delete one or more worktrees
     status                Show status of all worktrees (dirty/clean, ahead/behind)
@@ -96,31 +96,40 @@ EOF
 
 # List worktrees and select one to switch to
 cmd_list() {
+  check_git_repo
+  check_dependencies
+
+  local selected_worktree=$(git worktree list | fzf --prompt="Select worktree: " --height=40% --reverse | awk '{print $1}')
+
+  if [ -n "$selected_worktree" ]; then
+    echo "CD:$selected_worktree"
+  fi
+}
+
+# Switch directly to a worktree by branch name
+cmd_switch() {
   local target="$1"
   check_git_repo
 
-  if [[ -n "$target" ]]; then
-    # Direct selection by branch name or path
-    local selected_worktree
-    # Try to find by branch name first
-    selected_worktree=$(git worktree list | grep -E "\[$target\]" | awk '{print $1}' | head -1)
-    # If not found, try by path (partial match)
-    if [[ -z "$selected_worktree" ]]; then
-      selected_worktree=$(git worktree list | grep -F "$target" | awk '{print $1}' | head -1)
-    fi
-    if [[ -n "$selected_worktree" ]]; then
-      echo "CD:$selected_worktree"
-    else
-      echo -e "${RED}Error: No worktree found matching '$target'${NC}" >&2
-      exit 1
-    fi
+  if [[ -z "$target" ]]; then
+    # No argument, fall back to interactive list
+    cmd_list
+    return
+  fi
+
+  # Try to find by branch name first
+  local selected_worktree
+  selected_worktree=$(git worktree list | grep -E "\[$target\]" | awk '{print $1}' | head -1)
+  # If not found, try by path (partial match)
+  if [[ -z "$selected_worktree" ]]; then
+    selected_worktree=$(git worktree list | grep -F "$target" | awk '{print $1}' | head -1)
+  fi
+
+  if [[ -n "$selected_worktree" ]]; then
+    echo "CD:$selected_worktree"
   else
-    # Interactive selection
-    check_dependencies
-    local selected_worktree=$(git worktree list | fzf --prompt="Select worktree: " --height=40% --reverse | awk '{print $1}')
-    if [ -n "$selected_worktree" ]; then
-      echo "CD:$selected_worktree"
-    fi
+    echo -e "${RED}Error: No worktree found matching '$target'${NC}" >&2
+    exit 1
   fi
 }
 
@@ -641,7 +650,7 @@ main() {
 
   case "$subcommand" in
     list|ls)
-      cmd_list "$@"
+      cmd_list
       ;;
     add|new)
       cmd_add "$@"
@@ -683,9 +692,8 @@ main() {
       show_version
       ;;
     *)
-      echo -e "${RED}Error: Unknown subcommand '$subcommand'${NC}" >&2
-      echo "Run 'gwf help' for usage information." >&2
-      exit 1
+      # Try to switch to worktree by branch name
+      cmd_switch "$subcommand"
       ;;
   esac
 }

@@ -30,7 +30,7 @@ _gwf_completions() {
       COMPREPLY=( $(compgen -W "${branches}" -- ${cur}) )
       return 0
       ;;
-    delete|rm|list|ls)
+    delete|rm)
       local branches=$(_gwf_worktree_branches)
       COMPREPLY=( $(compgen -W "${branches}" -- ${cur}) )
       return 0
