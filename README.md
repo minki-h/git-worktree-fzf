@@ -2,6 +2,29 @@
 
 An interactive Git worktree manager powered by fzf. Easily create, switch between, and delete Git worktrees with a beautiful fuzzy-finding interface.
 
+## Quick Start
+
+```bash
+# 1. Install
+brew tap minki-h/tap && brew install git-worktree-fzf
+
+# 2. Add shell wrapper (required for directory switching)
+# For Zsh - add to ~/.zshrc:
+gwf() {
+  local result=$(command gwf "$@")
+  if [[ "$result" == CD:* ]]; then cd "${result#CD:}"; else echo "$result"; fi
+}
+
+# 3. Clone a repo for worktree workflow
+gwf init myproject git@github.com:user/repo.git
+
+# 4. Start working!
+gwf                    # List & switch worktrees (interactive)
+gwf add feature/login  # Create new worktree
+gwf status             # See all worktrees at a glance
+gwf rm feature/old     # Delete worktree
+```
+
 ## Features
 
 - 🔍 **Interactive worktree selection** with fzf
@@ -105,12 +128,12 @@ gwf new      # Alias for add
 1. **Checkout existing branch**: Select a branch from the list to create a worktree for it
 2. **Create new branch**: Type a new branch name to create a new branch and worktree
 
-The worktree will be created in `../{branch-name}` (with `/` replaced by `_`).
+The worktree will be created as a sibling directory using the branch name (nested directories for `/`).
 
 **Examples:**
 
-- Select `feature/auth` → creates worktree at `../feature_auth`
-- Type `bugfix/login` → creates new branch and worktree at `../bugfix_login`
+- Select `feature/auth` → creates worktree at `../feature/auth`
+- Type `bugfix/login` → creates new branch and worktree at `../bugfix/login`
 
 ### Delete Worktrees
 
@@ -145,11 +168,15 @@ gwf init myproject                              # Create new bare repo
 gwf init myproject git@github.com:user/repo.git # Clone as bare repo
 ```
 
-This creates a bare repository structure optimized for worktree workflow:
+This creates a clean directory structure optimized for worktree workflow:
 ```
-myproject.git/   <- bare repo (git data only)
-myproject/       <- main worktree (main/master branch)
+myproject/
+  .bare/         <- bare repo (git data only)
+  main/          <- main worktree (auto-detected default branch)
+  feature/login/ <- additional worktrees go here
 ```
+
+The default branch is auto-detected from the remote (main/master).
 
 ### Lock/Unlock Worktrees
 
@@ -215,7 +242,7 @@ The shell wrapper function intercepts the output and performs the `cd` command w
 ```bash
 gwf add
 # Select or type: feature/new-api
-# Creates: ../feature_new-api
+# Creates: ../feature/new-api
 # Automatically switches to that directory
 ```
 
