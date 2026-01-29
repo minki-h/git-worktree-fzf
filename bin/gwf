@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.3.5"
+VERSION="1.3.6"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -259,9 +259,7 @@ cmd_delete() {
   if [[ -n "$force_flag" ]]; then
     echo -e "${RED}(force mode)${NC}"
   fi
-  read -p "Continue? [y/N] " -n 1 -r
-  echo
-
+  read -p "Continue? [y/N] " -r
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     local failed=0
     local removed_branches=()
@@ -288,8 +286,7 @@ cmd_delete() {
       for branch in "${removed_branches[@]}"; do
         echo "  $branch"
       done
-      read -p "Delete these branches? [y/N] " -n 1 -r
-      echo
+      read -p "Delete these branches? [y/N] " -r
       if [[ $REPLY =~ ^[Yy]$ ]]; then
         for branch in "${removed_branches[@]}"; do
           if git branch -d "$branch" 2>/dev/null; then
@@ -458,9 +455,7 @@ cmd_prune() {
     fi
   done < <(git worktree list)
 
-  read -p "Continue with prune? [y/N] " -n 1 -r
-  echo
-
+  read -p "Continue with prune? [y/N] " -r
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     git worktree prune -v
     echo -e "${GREEN}Done!${NC}"
