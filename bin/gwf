@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.2.2"
+VERSION="1.2.3"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -167,8 +167,12 @@ cmd_add() {
     fi
   fi
 
+  # Get the base directory (parent of main worktree)
+  local main_worktree=$(git worktree list | head -1 | awk '{print $1}')
+  local base_dir=$(dirname "$main_worktree")
+
   # Use branch name as folder path (create nested directories if needed)
-  local target_path="../$target_branch"
+  local target_path="$base_dir/$target_branch"
   local parent_dir=$(dirname "$target_path")
   if [[ ! -d "$parent_dir" ]]; then
     mkdir -p "$parent_dir"
