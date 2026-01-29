@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.3.0"
+VERSION="1.3.1"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -617,25 +617,22 @@ cmd_init() {
     echo -e "${GREEN}Created empty bare repository${NC}"
   fi
 
-  # Determine default branch
+  # Determine default branch from bare repo's HEAD
   local default_branch=""
   if [[ -n "$remote_url" ]]; then
-    default_branch=$(git -C "$bare_dir" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
-    if [[ -z "$default_branch" ]]; then
-      # Try common default branch names
-      if git -C "$bare_dir" show-ref --verify --quiet refs/heads/main 2>/dev/null || git -C "$bare_dir" show-ref --verify --quiet refs/remotes/origin/main 2>/dev/null; then
-        default_branch="main"
-      elif git -C "$bare_dir" show-ref --verify --quiet refs/heads/master 2>/dev/null || git -C "$bare_dir" show-ref --verify --quiet refs/remotes/origin/master 2>/dev/null; then
-        default_branch="master"
-      fi
-    fi
-  else
+    # Bare repo's HEAD points to the default branch after clone
+    default_branch=$(git -C "$bare_dir" symbolic-ref HEAD 2>/dev/null | sed 's@^refs/heads/@@')
+  fi
+
+  # Fallback to main if not detected
+  if [[ -z "$default_branch" ]]; then
     default_branch="main"
   fi
 
-  # Create main worktree with default branch name as directory
+  # Create main worktree with absolute path (required for git -C)
   if [[ -n "$default_branch" ]]; then
-    local worktree_path="$base_dir/$default_branch"
+    local worktree_path
+    worktree_path="$(pwd)/$base_dir/$default_branch"
     echo -e "${CYAN}Creating main worktree for branch: $default_branch${NC}"
     git -C "$bare_dir" worktree add "$worktree_path" "$default_branch" 2>/dev/null || \
       git -C "$bare_dir" worktree add -b "$default_branch" "$worktree_path"
