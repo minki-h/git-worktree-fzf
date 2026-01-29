@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -125,9 +125,12 @@ cmd_add() {
     exit 0
   fi
 
-  # Convert branch name to folder name (replace / with _)
-  local folder_name=$(echo "$target_branch" | sed 's/\//_/g')
-  local target_path="../$folder_name"
+  # Use branch name as folder path (create nested directories if needed)
+  local target_path="../$target_branch"
+  local parent_dir=$(dirname "$target_path")
+  if [[ ! -d "$parent_dir" ]]; then
+    mkdir -p "$parent_dir"
+  fi
 
   # Check if branch exists
   if git rev-parse --verify "$target_branch" >/dev/null 2>&1; then
@@ -135,8 +138,8 @@ cmd_add() {
     git worktree add "$target_path" "$target_branch"
   else
     # Determine base point for new branch
-    local base_point=$selected
-    if [ "$query" = "$selected" ] || [ -z "$selected" ]; then
+    local base_point="$selected"
+    if [[ "$query" = "$selected" ]] || [[ -z "$selected" ]]; then
       base_point="HEAD"
     fi
 
@@ -172,11 +175,19 @@ cmd_delete() {
   echo
 
   if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "$selected" | while IFS= read -r worktree; do
+    local failed=0
+    while IFS= read -r worktree; do
       echo -e "${GREEN}Removing: $worktree${NC}"
-      git worktree remove "$worktree"
-    done
-    echo -e "${GREEN}Done!${NC}"
+      if ! git worktree remove "$worktree"; then
+        echo -e "${RED}Failed to remove: $worktree${NC}" >&2
+        ((failed++)) || true
+      fi
+    done <<< "$selected"
+    if [[ $failed -eq 0 ]]; then
+      echo -e "${GREEN}Done!${NC}"
+    else
+      echo -e "${YELLOW}Completed with $failed failure(s)${NC}"
+    fi
   else
     echo -e "${YELLOW}Cancelled${NC}"
   fi
@@ -319,12 +330,13 @@ cmd_prune() {
   fi
 
   echo -e "${YELLOW}The following stale worktrees will be pruned:${NC}"
-  git worktree list | while read -r line; do
-    local path=$(echo "$line" | awk '{print $1}')
+  while read -r line; do
+    local path
+    path=$(echo "$line" | awk '{print $1}')
     if [[ ! -d "$path" ]]; then
       echo -e "  ${RED}$line${NC}"
     fi
-  done
+  done < <(git worktree list)
 
   read -p "Continue with prune? [y/N] " -n 1 -r
   echo
@@ -438,6 +450,12 @@ cmd_move() {
   # Expand ~ to home directory
   new_path="${new_path/#\~/$HOME}"
 
+  # Create parent directory if it doesn't exist
+  local parent_dir=$(dirname "$new_path")
+  if [[ ! -d "$parent_dir" ]]; then
+    mkdir -p "$parent_dir"
+  fi
+
   git worktree move "$selected" "$new_path"
   echo -e "${GREEN}Moved to: $new_path${NC}"
 }
@@ -473,6 +491,12 @@ cmd_init() {
   if [[ -z "$repo_name" ]]; then
     echo -e "${RED}Error: Repository name required${NC}" >&2
     echo "Usage: gwf init <repo-name> [remote-url]" >&2
+    exit 1
+  fi
+
+  # Prevent / in repo_name to avoid nested directories
+  if [[ "$repo_name" == */* ]]; then
+    echo -e "${RED}Error: Repository name cannot contain '/'${NC}" >&2
     exit 1
   fi
 
