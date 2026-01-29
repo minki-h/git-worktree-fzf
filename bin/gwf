@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.2.4"
+VERSION="1.3.0"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -589,13 +589,17 @@ cmd_init() {
   fi
 
   local remote_url="$2"
-  local bare_dir="${repo_name}.git"
+  local base_dir="$repo_name"
+  local bare_dir="$repo_name/.bare"
 
   # Check if directory already exists
-  if [[ -d "$bare_dir" ]]; then
-    echo -e "${RED}Error: Directory '$bare_dir' already exists${NC}" >&2
+  if [[ -d "$base_dir" ]]; then
+    echo -e "${RED}Error: Directory '$base_dir' already exists${NC}" >&2
     exit 1
   fi
+
+  # Create base directory
+  mkdir -p "$base_dir"
 
   echo -e "${CYAN}Initializing bare repository: $bare_dir${NC}"
 
@@ -613,18 +617,15 @@ cmd_init() {
     echo -e "${GREEN}Created empty bare repository${NC}"
   fi
 
-  # Create main worktree
-  cd "$bare_dir"
-
   # Determine default branch
   local default_branch=""
   if [[ -n "$remote_url" ]]; then
-    default_branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
+    default_branch=$(git -C "$bare_dir" symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')
     if [[ -z "$default_branch" ]]; then
       # Try common default branch names
-      if git show-ref --verify --quiet refs/heads/main 2>/dev/null || git show-ref --verify --quiet refs/remotes/origin/main 2>/dev/null; then
+      if git -C "$bare_dir" show-ref --verify --quiet refs/heads/main 2>/dev/null || git -C "$bare_dir" show-ref --verify --quiet refs/remotes/origin/main 2>/dev/null; then
         default_branch="main"
-      elif git show-ref --verify --quiet refs/heads/master 2>/dev/null || git show-ref --verify --quiet refs/remotes/origin/master 2>/dev/null; then
+      elif git -C "$bare_dir" show-ref --verify --quiet refs/heads/master 2>/dev/null || git -C "$bare_dir" show-ref --verify --quiet refs/remotes/origin/master 2>/dev/null; then
         default_branch="master"
       fi
     fi
@@ -632,30 +633,38 @@ cmd_init() {
     default_branch="main"
   fi
 
+  # Create main worktree with default branch name as directory
   if [[ -n "$default_branch" ]]; then
+    local worktree_path="$base_dir/$default_branch"
     echo -e "${CYAN}Creating main worktree for branch: $default_branch${NC}"
-    git worktree add "../$repo_name" "$default_branch" 2>/dev/null || git worktree add -b "$default_branch" "../$repo_name"
+    git -C "$bare_dir" worktree add "$worktree_path" "$default_branch" 2>/dev/null || \
+      git -C "$bare_dir" worktree add -b "$default_branch" "$worktree_path"
   fi
-
-  cd ..
 
   echo ""
   echo -e "${GREEN}✓ Bare repository setup complete!${NC}"
   echo ""
   echo -e "${BOLD}Directory structure:${NC}"
-  echo -e "  ${CYAN}$bare_dir/${NC}          <- bare repo (git data)"
+  echo -e "  ${CYAN}$base_dir/${NC}"
+  echo -e "    ${CYAN}.bare/${NC}           <- bare repo (git data)"
   if [[ -n "$default_branch" ]]; then
-    echo -e "  ${CYAN}$repo_name/${NC}           <- main worktree ($default_branch)"
+    echo -e "    ${CYAN}$default_branch/${NC}           <- main worktree"
   fi
   echo ""
   echo -e "${BOLD}Next steps:${NC}"
-  echo -e "  cd $repo_name"
+  if [[ -n "$default_branch" ]]; then
+    echo -e "  cd $base_dir/$default_branch"
+  else
+    echo -e "  cd $base_dir"
+  fi
   echo -e "  gwf add              # Add more worktrees"
   echo ""
 
   # Output path to cd into
-  if [[ -d "$repo_name" ]]; then
-    echo "CD:$repo_name"
+  if [[ -n "$default_branch" ]] && [[ -d "$base_dir/$default_branch" ]]; then
+    echo "CD:$base_dir/$default_branch"
+  elif [[ -d "$base_dir" ]]; then
+    echo "CD:$base_dir"
   fi
 }
 
