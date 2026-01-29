@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+
+set -e
+
+VERSION="1.0.0"
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Check for required dependencies
+check_dependencies() {
+  if ! command -v git &> /dev/null; then
+    echo -e "${RED}Error: git is required but not installed.${NC}" >&2
+    exit 1
+  fi
+
+  if ! command -v fzf &> /dev/null; then
+    echo -e "${RED}Error: fzf is required but not installed.${NC}" >&2
+    echo "Install it with: brew install fzf" >&2
+    exit 1
+  fi
+}
+
+# Check if we're in a git repository
+check_git_repo() {
+  if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo -e "${RED}Error: Not a git repository${NC}" >&2
+    exit 1
+  fi
+}
+
+# Show help message
+show_help() {
+  cat << EOF
+gwf - Git Worktree with FZF
+
+USAGE:
+    gwf [SUBCOMMAND]
+
+SUBCOMMANDS:
+    list, ls        List and switch to a worktree (default)
+    add, new        Add a new worktree
+    delete, rm      Delete one or more worktrees
+    help, --help    Show this help message
+    version         Show version information
+
+EXAMPLES:
+    gwf             # Interactive list and switch
+    gwf add         # Create new worktree
+    gwf delete      # Delete worktrees
+
+SHELL INTEGRATION:
+    The 'list' command outputs a path prefixed with 'CD:' which can be
+    captured by a shell wrapper function to actually change directory.
+
+    Add this to your ~/.bashrc or ~/.zshrc:
+
+    gwf() {
+      local result=\$(command gwf "\$@")
+      if [[ "\$result" == CD:* ]]; then
+        cd "\${result#CD:}"
+      else
+        echo "\$result"
+      fi
+    }
+
+DEPENDENCIES:
+    - git (for git worktree management)
+    - fzf (for interactive selection)
+
+EOF
+}
+
+# List worktrees and select one to switch to
+cmd_list() {
+  check_git_repo
+  check_dependencies
+
+  local selected_worktree=$(git worktree list | fzf --prompt="Select worktree: " --height=40% --reverse | awk '{print $1}')
+
+  if [ -n "$selected_worktree" ]; then
+    echo "CD:$selected_worktree"
+  fi
+}
+
+# Add a new worktree
+cmd_add() {
+  check_git_repo
+  check_dependencies
+
+  # Get list of all branches (local and remote, deduplicated)
+  local branches=$(git branch -a | sed 's/.* //g' | sed 's/remotes\/origin\///' | sort -u)
+
+  # Use fzf with --print-query to allow both selection and new branch creation
+  local selected=$(echo "$branches" | fzf --print-query --prompt="Select or type new branch: " --height=40% --reverse)
+
+  # Extract query and selection
+  local query=$(echo "$selected" | head -n1)
+  selected=$(echo "$selected" | tail -n1)
+
+  # Use query if provided, otherwise use selection
+  local target_branch=${query:-$selected}
+
+  if [ -z "$target_branch" ]; then
+    echo -e "${YELLOW}No branch selected${NC}" >&2
+    exit 0
+  fi
+
+  # Convert branch name to folder name (replace / with _)
+  local folder_name=$(echo "$target_branch" | sed 's/\//_/g')
+  local target_path="../$folder_name"
+
+  # Check if branch exists
+  if git rev-parse --verify "$target_branch" >/dev/null 2>&1; then
+    echo -e "${GREEN}Checking out existing branch: $target_branch${NC}"
+    git worktree add "$target_path" "$target_branch"
+  else
+    # Determine base point for new branch
+    local base_point=$selected
+    if [ "$query" = "$selected" ] || [ -z "$selected" ]; then
+      base_point="HEAD"
+    fi
+
+    echo -e "${GREEN}Creating new branch: $target_branch from $base_point${NC}"
+    git worktree add -b "$target_branch" "$target_path" "$base_point"
+  fi
+
+  # Output the path for the shell wrapper to cd into
+  if [ -d "$target_path" ]; then
+    echo "CD:$target_path"
+  else
+    echo -e "${RED}Error: Directory $target_path was not created.${NC}" >&2
+    exit 1
+  fi
+}
+
+# Delete one or more worktrees
+cmd_delete() {
+  check_git_repo
+  check_dependencies
+
+  local selected=$(git worktree list | fzf --multi --prompt="Delete worktree(s): " --height=40% --reverse | awk '{print $1}')
+
+  if [ -z "$selected" ]; then
+    echo -e "${YELLOW}No worktrees selected${NC}" >&2
+    exit 0
+  fi
+
+  # Confirm deletion
+  echo -e "${YELLOW}About to delete:${NC}"
+  echo "$selected"
+  read -p "Continue? [y/N] " -n 1 -r
+  echo
+
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "$selected" | while IFS= read -r worktree; do
+      echo -e "${GREEN}Removing: $worktree${NC}"
+      git worktree remove "$worktree"
+    done
+    echo -e "${GREEN}Done!${NC}"
+  else
+    echo -e "${YELLOW}Cancelled${NC}"
+  fi
+}
+
+# Show version
+show_version() {
+  echo "gwf version $VERSION"
+}
+
+# Main entry point
+main() {
+  local subcommand="${1:-list}"
+
+  case "$subcommand" in
+    list|ls)
+      cmd_list
+      ;;
+    add|new)
+      cmd_add
+      ;;
+    delete|rm)
+      cmd_delete
+      ;;
+    help|--help|-h)
+      show_help
+      ;;
+    version|--version|-v)
+      show_version
+      ;;
+    *)
+      echo -e "${RED}Error: Unknown subcommand '$subcommand'${NC}" >&2
+      echo "Run 'gwf help' for usage information." >&2
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
