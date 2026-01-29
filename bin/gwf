@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.2.3"
+VERSION="1.2.4"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -47,7 +47,7 @@ USAGE:
 SUBCOMMANDS:
     list, ls              List and switch to a worktree (interactive)
     add, new [branch]     Add a new worktree for branch
-    delete, rm [branch..] Delete one or more worktrees
+    delete, rm [-f] [branch..] Delete one or more worktrees
     status                Show status of all worktrees (dirty/clean, ahead/behind)
     info                  Show current worktree information
     prune                 Remove stale worktree entries
@@ -214,10 +214,24 @@ cmd_delete() {
   check_git_repo
 
   local selected=""
+  local force_flag=""
 
-  if [[ $# -gt 0 ]]; then
+  # Parse flags
+  local args=()
+  for arg in "$@"; do
+    case "$arg" in
+      -f|--force)
+        force_flag="--force"
+        ;;
+      *)
+        args+=("$arg")
+        ;;
+    esac
+  done
+
+  if [[ ${#args[@]} -gt 0 ]]; then
     # Direct mode: arguments provided
-    for target in "$@"; do
+    for target in "${args[@]}"; do
       local worktree_path
       worktree_path=$(find_worktree "$target")
       if [[ -n "$worktree_path" ]]; then
@@ -241,6 +255,9 @@ cmd_delete() {
   # Confirm deletion
   echo -e "${YELLOW}About to delete:${NC}"
   echo "$selected"
+  if [[ -n "$force_flag" ]]; then
+    echo -e "${RED}(force mode)${NC}"
+  fi
   read -p "Continue? [y/N] " -n 1 -r
   echo
 
@@ -249,7 +266,7 @@ cmd_delete() {
     while IFS= read -r worktree; do
       [[ -z "$worktree" ]] && continue
       echo -e "${GREEN}Removing: $worktree${NC}"
-      if ! git worktree remove "$worktree"; then
+      if ! git worktree remove $force_flag "$worktree"; then
         echo -e "${RED}Failed to remove: $worktree${NC}" >&2
         ((failed++)) || true
       fi
