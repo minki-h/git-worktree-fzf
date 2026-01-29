@@ -1,5 +1,26 @@
 #compdef gwf
 
+# Get list of branches (for add command)
+_gwf_branches() {
+  local -a branches
+  branches=(${(f)"$(git branch -a 2>/dev/null | sed 's/.* //g' | sed 's/remotes\/origin\///' | sort -u)"})
+  _describe -t branches 'branch' branches
+}
+
+# Get list of worktree branches (for delete/list commands)
+_gwf_worktrees() {
+  local -a worktrees
+  worktrees=(${(f)"$(git worktree list 2>/dev/null | awk '{print $1}' | xargs -I{} basename {})"})
+  _describe -t worktrees 'worktree' worktrees
+}
+
+# Get list of worktree branch names
+_gwf_worktree_branches() {
+  local -a branches
+  branches=(${(f)"$(git worktree list 2>/dev/null | grep -oE '\[.*\]' | tr -d '[]')"})
+  _describe -t branches 'worktree branch' branches
+}
+
 _gwf() {
   local -a subcommands
   subcommands=(
@@ -29,9 +50,23 @@ _gwf() {
   case $state in
     subcommand)
       _describe -t subcommands 'gwf subcommand' subcommands
+      # Also allow direct branch completion (gwf feature/xxx)
+      _gwf_worktree_branches
       ;;
     args)
       case $words[1] in
+        add|new)
+          _gwf_branches
+          ;;
+        delete|rm)
+          _gwf_worktree_branches
+          ;;
+        list|ls)
+          _gwf_worktree_branches
+          ;;
+        lock|unlock|move)
+          _gwf_worktrees
+          ;;
         init)
           _arguments '1:repo name:' '2:remote url:'
           ;;

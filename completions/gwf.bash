@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+_gwf_branches() {
+  git branch -a 2>/dev/null | sed 's/.* //g' | sed 's/remotes\/origin\///' | sort -u
+}
+
+_gwf_worktree_branches() {
+  git worktree list 2>/dev/null | grep -oE '\[.*\]' | tr -d '[]'
+}
+
 _gwf_completions() {
   local cur prev subcommands
   COMPREPLY=()
@@ -9,15 +17,31 @@ _gwf_completions() {
 
   # Complete subcommands if we're on the first argument
   if [[ ${COMP_CWORD} -eq 1 ]]; then
-    COMPREPLY=( $(compgen -W "${subcommands}" -- ${cur}) )
+    # Include both subcommands and worktree branches for direct access
+    local branches=$(_gwf_worktree_branches)
+    COMPREPLY=( $(compgen -W "${subcommands} ${branches}" -- ${cur}) )
     return 0
   fi
 
-  # Handle init subcommand (directory completion for second arg)
-  if [[ ${COMP_CWORD} -eq 2 && "${COMP_WORDS[1]}" == "init" ]]; then
-    COMPREPLY=( $(compgen -d -- ${cur}) )
-    return 0
-  fi
+  # Handle subcommand-specific completions
+  case "${COMP_WORDS[1]}" in
+    add|new)
+      local branches=$(_gwf_branches)
+      COMPREPLY=( $(compgen -W "${branches}" -- ${cur}) )
+      return 0
+      ;;
+    delete|rm|list|ls)
+      local branches=$(_gwf_worktree_branches)
+      COMPREPLY=( $(compgen -W "${branches}" -- ${cur}) )
+      return 0
+      ;;
+    init)
+      if [[ ${COMP_CWORD} -eq 2 ]]; then
+        COMPREPLY=( $(compgen -d -- ${cur}) )
+      fi
+      return 0
+      ;;
+  esac
 }
 
 complete -F _gwf_completions gwf
