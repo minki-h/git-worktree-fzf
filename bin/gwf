@@ -150,20 +150,24 @@ cmd_add() {
     local selected=$(echo "$branches" | fzf --print-query --prompt="Select or type new branch: " --height=40% --reverse)
 
     # Extract query and selection
+    # --print-query outputs: line1=query (what user typed), line2=selection (what was selected)
     local query=$(echo "$selected" | head -n1)
     selected=$(echo "$selected" | tail -n1)
 
-    # Use query if provided, otherwise use selection
-    target_branch=${query:-$selected}
+    # Use selection as the target branch
+    target_branch="$selected"
 
     if [[ -z "$target_branch" ]]; then
       echo -e "${YELLOW}No branch selected${NC}" >&2
       exit 0
     fi
 
-    # Update base_point based on selection
-    if [[ "$query" != "$selected" ]] && [[ -n "$selected" ]]; then
-      base_point="$selected"
+    # Ask if user wants to create with a different name
+    echo -e "${CYAN}Selected: $target_branch${NC}"
+    read -p "New branch name (empty to use selected): " new_name
+    if [[ -n "$new_name" ]]; then
+      base_point="$target_branch"
+      target_branch="$new_name"
     fi
   fi
 
