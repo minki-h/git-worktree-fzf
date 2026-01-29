@@ -16,7 +16,7 @@ An interactive Git worktree manager powered by fzf. Easily create, switch betwee
 ### Via Homebrew
 
 ```bash
-brew tap yourusername/tap
+brew tap minki-h/tap
 brew install git-worktree-fzf
 ```
 
@@ -24,7 +24,7 @@ brew install git-worktree-fzf
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/git-worktree-fzf.git
+git clone https://github.com/minki-h/git-worktree-fzf.git
 cd git-worktree-fzf
 
 # Make the script executable
