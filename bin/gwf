@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.3.4"
+VERSION="1.3.5"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -264,14 +264,45 @@ cmd_delete() {
 
   if [[ $REPLY =~ ^[Yy]$ ]]; then
     local failed=0
+    local removed_branches=()
     while IFS= read -r worktree; do
       [[ -z "$worktree" ]] && continue
+      # Get branch name before removing worktree
+      local branch_name=$(git worktree list | grep "^$worktree " | sed 's/.*\[\(.*\)\].*/\1/')
       echo -e "${GREEN}Removing: $worktree${NC}"
-      if ! git worktree remove $force_flag "$worktree"; then
+      if git worktree remove $force_flag "$worktree"; then
+        # Track successfully removed branches (skip detached HEAD)
+        if [[ -n "$branch_name" ]] && [[ "$branch_name" != "detached" ]]; then
+          removed_branches+=("$branch_name")
+        fi
+      else
         echo -e "${RED}Failed to remove: $worktree${NC}" >&2
         ((failed++)) || true
       fi
     done <<< "$selected"
+
+    # Ask to delete branches
+    if [[ ${#removed_branches[@]} -gt 0 ]]; then
+      echo ""
+      echo -e "${YELLOW}Delete branches as well?${NC}"
+      for branch in "${removed_branches[@]}"; do
+        echo "  $branch"
+      done
+      read -p "Delete these branches? [y/N] " -n 1 -r
+      echo
+      if [[ $REPLY =~ ^[Yy]$ ]]; then
+        for branch in "${removed_branches[@]}"; do
+          if git branch -d "$branch" 2>/dev/null; then
+            echo -e "${GREEN}Deleted branch: $branch${NC}"
+          elif git branch -D "$branch" 2>/dev/null; then
+            echo -e "${YELLOW}Force deleted branch: $branch${NC}"
+          else
+            echo -e "${RED}Failed to delete branch: $branch${NC}" >&2
+          fi
+        done
+      fi
+    fi
+
     if [[ $failed -eq 0 ]]; then
       echo -e "${GREEN}Done!${NC}"
     else
