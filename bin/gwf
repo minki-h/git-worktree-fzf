@@ -188,6 +188,23 @@ cmd_add() {
   fi
 }
 
+# Remove empty parent directories up to base_dir
+cleanup_empty_parents() {
+  local dir="$1"
+  local base_dir="$2"
+
+  while [[ "$dir" != "$base_dir" && -d "$dir" ]]; do
+    # Check if directory is empty
+    if [[ -z "$(ls -A "$dir" 2>/dev/null)" ]]; then
+      echo -e "${DIM}Removing empty directory: $dir${NC}"
+      rmdir "$dir"
+      dir=$(dirname "$dir")
+    else
+      break
+    fi
+  done
+}
+
 # Find worktree path by branch name or partial path match
 find_worktree() {
   local target="$1"
@@ -204,6 +221,10 @@ find_worktree() {
 # Delete one or more worktrees
 cmd_delete() {
   check_git_repo
+
+  # Get base_dir (parent of main worktree) for cleanup_empty_parents
+  local main_worktree=$(git worktree list | head -1 | awk '{print $1}')
+  local base_dir=$(dirname "$main_worktree")
 
   local selected=""
   local force_flag=""
@@ -264,6 +285,8 @@ cmd_delete() {
         if [[ -n "$branch_name" ]] && [[ "$branch_name" != "detached" ]]; then
           removed_branches+=("$branch_name")
         fi
+        # Clean up empty parent directories
+        cleanup_empty_parents "$(dirname "$worktree")" "$base_dir"
       else
         echo -e "${RED}Failed to remove: $worktree${NC}" >&2
         ((failed++)) || true
