@@ -57,6 +57,7 @@ SUBCOMMANDS:
     repair                Repair worktree administrative files
     main                  Switch to main worktree (no fzf)
     init <name> [url]     Initialize a bare repo for worktree workflow
+    shell-init            Output shell integration wrapper function
     help, --help          Show this help message
     version               Show version information
 
@@ -73,19 +74,9 @@ EXAMPLES:
     gwf init myproj         # Init bare repo for worktree workflow
 
 SHELL INTEGRATION:
-    The 'list' command outputs a path prefixed with 'CD:' which can be
-    captured by a shell wrapper function to actually change directory.
-
     Add this to your ~/.bashrc or ~/.zshrc:
 
-    gwf() {
-      local result=\$(command gwf "\$@")
-      if [[ "\$result" == CD:* ]]; then
-        cd "\${result#CD:}"
-      else
-        echo "\$result"
-      fi
-    }
+    eval "\$(gwf shell-init)"
 
 DEPENDENCIES:
     - git (for git worktree management)
@@ -692,6 +683,22 @@ cmd_init() {
   fi
 }
 
+# Output shell integration wrapper function
+cmd_shell_init() {
+  cat <<'EOF'
+gwf() {
+  local output=$(command gwf "$@")
+  local last_line="${output##*$'\n'}"
+  if [[ "$last_line" == CD:* ]]; then
+    echo "${output%$'\n'$last_line}"
+    cd "${last_line#CD:}"
+  else
+    echo "$output"
+  fi
+}
+EOF
+}
+
 # Show version
 show_version() {
   echo "gwf version $VERSION"
@@ -738,6 +745,9 @@ main() {
       ;;
     init)
       cmd_init "$@"
+      ;;
+    shell-init)
+      cmd_shell_init
       ;;
     help|--help|-h)
       show_help

@@ -71,30 +71,10 @@ cp completions/gwf.bash /usr/local/etc/bash_completion.d/
 
 Since shell scripts can't change the parent shell's directory, you need to add a wrapper function to your shell configuration.
 
-### For Zsh (add to `~/.zshrc`):
-
-```zsh
-gwf() {
-  local result=$(command gwf "$@")
-  if [[ "$result" == CD:* ]]; then
-    cd "${result#CD:}"
-  else
-    echo "$result"
-  fi
-}
-```
-
-### For Bash (add to `~/.bashrc`):
+Add this to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
-gwf() {
-  local result=$(command gwf "$@")
-  if [[ "$result" == CD:* ]]; then
-    cd "${result#CD:}"
-  else
-    echo "$result"
-  fi
-}
+eval "$(gwf shell-init)"
 ```
 
 After adding the wrapper, reload your shell:

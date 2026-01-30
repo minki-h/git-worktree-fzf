@@ -39,6 +39,7 @@ _gwf() {
     'repair:Repair worktree administrative files'
     'main:Switch to main worktree'
     'init:Initialize bare repo for worktree workflow'
+    'shell-init:Output shell integration wrapper function'
     'help:Show help message'
     'version:Show version information'
   )

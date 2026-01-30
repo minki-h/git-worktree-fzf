@@ -13,7 +13,7 @@ _gwf_completions() {
   COMPREPLY=()
   cur="${COMP_WORDS[COMP_CWORD]}"
   prev="${COMP_WORDS[COMP_CWORD-1]}"
-  subcommands="list ls add new delete rm status info prune lock unlock move repair main init help version"
+  subcommands="list ls add new delete rm status info prune lock unlock move repair main init shell-init help version"
 
   # Complete subcommands if we're on the first argument
   if [[ ${COMP_CWORD} -eq 1 ]]; then
