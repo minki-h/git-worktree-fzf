@@ -154,7 +154,7 @@ cmd_add() {
     fi
 
     # Ask if user wants a custom directory name
-    echo -e "${CYAN}Selected: $target_branch${NC}"
+    echo -e "${CYAN}Selected: $target_branch${NC}" >&2
     read -p "Directory name (empty to use branch name): " custom_dir
   fi
 
@@ -172,10 +172,10 @@ cmd_add() {
 
   # Check if branch exists
   if git rev-parse --verify "$target_branch" >/dev/null 2>&1; then
-    echo -e "${GREEN}Checking out existing branch: $target_branch${NC}"
+    echo -e "${GREEN}Checking out existing branch: $target_branch${NC}" >&2
     git worktree add "$target_path" "$target_branch"
   else
-    echo -e "${GREEN}Creating new branch: $target_branch from $base_point${NC}"
+    echo -e "${GREEN}Creating new branch: $target_branch from $base_point${NC}" >&2
     git worktree add -b "$target_branch" "$target_path" "$base_point"
   fi
 
@@ -196,7 +196,7 @@ cleanup_empty_parents() {
   while [[ "$dir" != "$base_dir" && -d "$dir" ]]; do
     # Check if directory is empty
     if [[ -z "$(ls -A "$dir" 2>/dev/null)" ]]; then
-      echo -e "${DIM}Removing empty directory: $dir${NC}"
+      echo -e "${DIM}Removing empty directory: $dir${NC}" >&2
       rmdir "$dir"
       dir=$(dirname "$dir")
     else
@@ -266,10 +266,10 @@ cmd_delete() {
   fi
 
   # Confirm deletion
-  echo -e "${YELLOW}About to delete:${NC}"
-  echo "$selected"
+  echo -e "${YELLOW}About to delete:${NC}" >&2
+  echo "$selected" >&2
   if [[ -n "$force_flag" ]]; then
-    echo -e "${RED}(force mode)${NC}"
+    echo -e "${RED}(force mode)${NC}" >&2
   fi
   read -p "Continue? [y/N] " -r
   if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -279,7 +279,7 @@ cmd_delete() {
       [[ -z "$worktree" ]] && continue
       # Get branch name before removing worktree
       local branch_name=$(git worktree list | grep "^$worktree " | sed 's/.*\[\(.*\)\].*/\1/')
-      echo -e "${GREEN}Removing: $worktree${NC}"
+      echo -e "${GREEN}Removing: $worktree${NC}" >&2
       if git worktree remove $force_flag "$worktree"; then
         # Track successfully removed branches (skip detached HEAD)
         if [[ -n "$branch_name" ]] && [[ "$branch_name" != "detached" ]]; then
@@ -295,18 +295,18 @@ cmd_delete() {
 
     # Ask to delete branches
     if [[ ${#removed_branches[@]} -gt 0 ]]; then
-      echo ""
-      echo -e "${YELLOW}Delete branches as well?${NC}"
+      echo "" >&2
+      echo -e "${YELLOW}Delete branches as well?${NC}" >&2
       for branch in "${removed_branches[@]}"; do
-        echo "  $branch"
+        echo "  $branch" >&2
       done
       read -p "Delete these branches? [y/N] " -r
       if [[ $REPLY =~ ^[Yy]$ ]]; then
         for branch in "${removed_branches[@]}"; do
           if git branch -d "$branch" 2>/dev/null; then
-            echo -e "${GREEN}Deleted branch: $branch${NC}"
+            echo -e "${GREEN}Deleted branch: $branch${NC}" >&2
           elif git branch -D "$branch" 2>/dev/null; then
-            echo -e "${YELLOW}Force deleted branch: $branch${NC}"
+            echo -e "${YELLOW}Force deleted branch: $branch${NC}" >&2
           else
             echo -e "${RED}Failed to delete branch: $branch${NC}" >&2
           fi
@@ -315,12 +315,12 @@ cmd_delete() {
     fi
 
     if [[ $failed -eq 0 ]]; then
-      echo -e "${GREEN}Done!${NC}"
+      echo -e "${GREEN}Done!${NC}" >&2
     else
-      echo -e "${YELLOW}Completed with $failed failure(s)${NC}"
+      echo -e "${YELLOW}Completed with $failed failure(s)${NC}" >&2
     fi
   else
-    echo -e "${YELLOW}Cancelled${NC}"
+    echo -e "${YELLOW}Cancelled${NC}" >&2
   fi
 }
 
@@ -713,7 +713,9 @@ gwf() {
   local output=$(command gwf "$@")
   local last_line="${output##*$'\n'}"
   if [[ "$last_line" == CD:* ]]; then
-    echo "${output%$'\n'$last_line}"
+    local rest="${output%"$last_line"}"
+    rest="${rest%$'\n'}"
+    [[ -n "$rest" ]] && echo "$rest"
     cd "${last_line#CD:}"
   else
     echo "$output"
