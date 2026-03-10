@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.5.1"
+VERSION="1.5.2"
 
 # Color codes for output
 RED='\033[0;31m'
@@ -170,9 +170,12 @@ cmd_add() {
     mkdir -p "$parent_dir"
   fi
 
-  # Check if branch exists
+  # Check if branch exists (local or remote)
   if git rev-parse --verify "$target_branch" >/dev/null 2>&1; then
     echo -e "${GREEN}Checking out existing branch: $target_branch${NC}" >&2
+    git worktree add "$target_path" "$target_branch"
+  elif git rev-parse --verify "origin/$target_branch" >/dev/null 2>&1; then
+    echo -e "${GREEN}Checking out remote branch: origin/$target_branch${NC}" >&2
     git worktree add "$target_path" "$target_branch"
   else
     echo -e "${GREEN}Creating new branch: $target_branch from $base_point${NC}" >&2
